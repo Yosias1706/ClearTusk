@@ -1,0 +1,63 @@
+{% extends "layout.html" %}
+
+{% block title %}DeepTusk{% endblock %}
+
+{% block content %}
+<section class="landing-shell">
+  <div class="row align-items-center g-5">
+    <div class="col-lg-6">
+      <span class="hero-badge mb-3">Elephant Voice Isolator</span>
+      <h1 class="display-4 fw-semibold">Preserve the elephant call. Reduce the machine noise.</h1>
+      <p class="lead hero-copy mt-3 mb-4">
+        DeepTusk is a research-facing workspace for denoising elephant recordings contaminated by airplanes,
+        cars, and generators while protecting the shape of the original vocalization.
+      </p>
+      <div class="d-flex flex-column flex-sm-row gap-3">
+        <a class="btn landing-cta" href="{{ url_for('index') }}">Open Field Dashboard</a>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="hero-card landing-feature-card">
+        <div class="hero-card-label">Workspace</div>
+        <div class="hero-card-title">Move from field recording to cleaner elephant-call output.</div>
+        <p class="mb-0">
+          Use the dashboard to inspect recordings, preview waveforms, and test denoising steps without
+          any third-party login flow in the way.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="workflow" class="mt-5">
+  <div class="row g-4">
+    <div class="col-md-4">
+      <div class="info-card h-100">
+        <div class="info-step">01</div>
+        <h2 class="h5 mb-2">Load Recordings</h2>
+        <p class="section-copy mb-0">
+          Bring in elephant recordings, spreadsheet metadata, and supporting spectrogram assets.
+        </p>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="info-card h-100">
+        <div class="info-step">02</div>
+        <h2 class="h5 mb-2">Process Carefully</h2>
+        <p class="section-copy mb-0">
+          Test denoising strategies intended to suppress human-made overlap without flattening the call.
+        </p>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="info-card h-100">
+        <div class="info-step">03</div>
+        <h2 class="h5 mb-2">Review Outputs</h2>
+        <p class="section-copy mb-0">
+          Compare raw and processed audio so researchers can judge whether preservation quality is good enough.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

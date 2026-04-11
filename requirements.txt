@@ -1,0 +1,6 @@
+flask
+librosa
+pandas
+soundfile
+scipy
+python-dotenv

@@ -1,0 +1,121 @@
+{% extends "layout.html" %}
+
+{% block title %}DeepTusk{% endblock %}
+
+{% block content %}
+<section class="hero-shell mb-5">
+  <div class="row align-items-center g-4">
+    <div class="col-lg-8">
+      <span class="hero-badge mb-3">Elephant Voice Isolator</span>
+      <h1 class="display-5 fw-semibold">Field Dashboard</h1>
+      <p class="lead hero-copy mb-0">
+        Explore elephant recordings, review labeled clips, visualize waveforms, and test denoising steps
+        designed to preserve the call while reducing vehicle and aircraft noise.
+      </p>
+    </div>
+    <div class="col-lg-4">
+      <div class="hero-card">
+        <div class="hero-card-label">Research Focus</div>
+        <div class="hero-card-title">Protect the call, soften the noise.</div>
+        <p class="mb-0">
+          Use the dashboard to compare recordings and move toward cleaner elephant vocalizations without
+          flattening the biological signal.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-lg app-panel">
+  <div class="card-body p-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
+      <div>
+        <h2 class="h4 mb-1">Recording Catalog</h2>
+        <p class="section-copy mb-0">Rows are loaded directly from <code>metadata.csv</code>.</p>
+      </div>
+      <span class="section-copy small">{{ metadata|length }} record(s)</span>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 records-table">
+        <thead>
+          <tr>
+            <th scope="col">ID</th>
+            <th scope="col">Label</th>
+            <th scope="col">Raw Audio</th>
+            <th scope="col">Waveform</th>
+            <th scope="col">Actions</th>
+            <th scope="col">Processed Output</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in metadata %}
+          <tr data-filename="{{ row.raw_file }}">
+            <td>{{ row.id }}</td>
+            <td>
+              <div class="fw-semibold">{{ row.label }}</div>
+              {% if row.notes %}
+              <div class="small section-copy">{{ row.notes }}</div>
+              {% endif %}
+            </td>
+            <td class="audio-cell">
+              {% if row.raw_url %}
+              <audio controls preload="none" class="w-100">
+                <source src="{{ row.raw_url }}" type="audio/wav">
+                Your browser does not support audio playback.
+              </audio>
+              {% else %}
+              <span class="text-secondary">No file</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.raw_url %}
+              <div
+                class="waveform"
+                data-waveform
+                data-audio-url="{{ row.raw_url }}"
+                data-waveform-id="waveform-{{ loop.index }}"
+                id="waveform-{{ loop.index }}"
+              ></div>
+              {% else %}
+              <span class="text-secondary">Unavailable</span>
+              {% endif %}
+            </td>
+            <td>
+              <button
+                class="btn process-btn"
+                type="button"
+                data-process-btn
+                data-filename="{{ row.raw_file }}"
+              >
+                Process
+              </button>
+              <div class="small mt-2 text-secondary status-message" data-status-message></div>
+            </td>
+            <td>
+              <div data-processed-output>
+                {% if row.processed_url %}
+                <audio controls preload="none" class="w-100">
+                  <source src="{{ row.processed_url }}" type="audio/wav">
+                  Your browser does not support audio playback.
+                </audio>
+                {% else %}
+                <span class="section-copy">Not processed yet</span>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center section-copy py-5">
+              No metadata found. Add records to <code>metadata.csv</code> and audio files to
+              <code>static/audio</code>.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}
