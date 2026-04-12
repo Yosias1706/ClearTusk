@@ -1,7 +1,4 @@
-from __future__ import annotations
-
 import csv
-import os
 from pathlib import Path
 from uuid import uuid4
 
@@ -9,7 +6,6 @@ import librosa  # noqa: F401
 import matplotlib
 import numpy as np  # noqa: F401
 import soundfile as sf
-from dotenv import load_dotenv
 from flask import Flask, abort, jsonify, render_template, request, send_from_directory, url_for
 
 from harmonic_cleaner import (
@@ -65,13 +61,9 @@ HOME_PAGE_SPECTROGRAM_EXAMPLES = [
     },
 ]
 
-load_dotenv(BASE_DIR / ".env")
-
 app = Flask(__name__, template_folder=str(TEMPLATES_DIR), static_folder=str(STATIC_DIR))
 app.config["UPLOAD_FOLDER"] = str(UPLOAD_FOLDER)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
-app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
-app.config["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "")
 
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 SPECTROGRAM_FOLDER.mkdir(parents=True, exist_ok=True)

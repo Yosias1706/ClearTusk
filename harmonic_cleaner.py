@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import Path
 
 import librosa
@@ -24,7 +22,6 @@ FMAX = 1000
 CORE_RUMBLE_BAND = (10, 150)
 MACHINE_BAND = (150, 1000)
 BASE_N_FFT = 2048
-BASE_HOP_LENGTH = 128
 BASE_WIN_LENGTH = 1024
 
 CALL_TYPE_CONFIGS: dict[str, dict[str, object]] = {
