@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}DeepTusk{% endblock %}
+{% block title %}ClearTusk{% endblock %}
 
 {% block content %}
 <section class="hero-shell mb-5">
@@ -21,6 +21,86 @@
           Use the dashboard to compare recordings and move toward cleaner elephant vocalizations without
           flattening the biological signal.
         </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-lg app-panel mb-5">
+  <div class="card-body p-4 p-lg-5">
+    <div class="row g-4 align-items-start">
+      <div class="col-lg-5">
+        <span class="hero-badge mb-3">Upload And Clean</span>
+        <h2 class="h3 mb-2">Run the harmonic cleaner on a field recording.</h2>
+        <p class="section-copy mb-4">
+          Upload a recording, choose the closest call type, and compare the original spectrogram against the cleaned result.
+        </p>
+
+        <form id="upload-clean-form" class="upload-form">
+          <div class="mb-3">
+            <label class="form-label" for="audio_file">Audio file</label>
+            <input class="form-control upload-input" type="file" id="audio_file" name="audio_file" accept=".wav,.mp3,.flac,.ogg,.m4a" required>
+          </div>
+          <div class="mb-4">
+            <label class="form-label" for="call_type">Call type</label>
+            <select class="form-select upload-input" id="call_type" name="call_type">
+              {% for call_type in call_types %}
+              <option value="{{ call_type }}">{{ call_type|title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button class="btn process-btn" type="submit" id="upload-submit-btn">Upload And Clean</button>
+          <div id="upload-status" class="small mt-3 status-message section-copy"></div>
+        </form>
+      </div>
+
+      <div class="col-lg-7">
+        <div id="upload-results" class="results-shell d-none">
+          <div class="results-header">
+            <div>
+              <h3 class="h5 mb-1">Cleaned Output</h3>
+              <p class="section-copy mb-0">
+                Best preset:
+                <span class="fw-semibold text-dark" id="selected-preset">-</span>
+              </p>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <div class="result-card">
+                <h4 class="h6 mb-3">Original Audio</h4>
+                <audio id="original-audio-player" controls preload="none" class="w-100"></audio>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="result-card">
+                <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+                  <h4 class="h6 mb-0">Cleaned Audio</h4>
+                  <a id="download-cleaned-audio" class="btn btn-sm process-btn" href="#" download>Download</a>
+                </div>
+                <audio id="cleaned-audio-player" controls preload="none" class="w-100"></audio>
+              </div>
+            </div>
+          </div>
+
+          <div class="metrics-grid mb-3" id="metrics-grid"></div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="result-card">
+                <h4 class="h6 mb-3">Original Spectrogram</h4>
+                <img id="original-spectrogram" class="spectrogram-image" alt="Original spectrogram">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="result-card">
+                <h4 class="h6 mb-3">Cleaned Spectrogram</h4>
+                <img id="cleaned-spectrogram" class="spectrogram-image" alt="Cleaned spectrogram">
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

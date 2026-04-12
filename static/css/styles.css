@@ -113,6 +113,80 @@ main,
   min-height: 100%;
 }
 
+.upload-form .form-label {
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.upload-input {
+  border-radius: 16px;
+  border: 1px solid rgba(47, 125, 78, 0.16);
+  background: rgba(255, 252, 244, 0.88);
+  color: var(--text-main);
+  padding: 0.8rem 1rem;
+}
+
+.upload-input:focus {
+  border-color: rgba(47, 125, 78, 0.38);
+  box-shadow: 0 0 0 0.2rem rgba(47, 125, 78, 0.12);
+}
+
+.results-shell {
+  padding: 1.25rem;
+  border-radius: 24px;
+  background: rgba(255, 250, 238, 0.7);
+  border: 1px solid rgba(93, 78, 55, 0.08);
+}
+
+.results-header {
+  margin-bottom: 1rem;
+}
+
+.result-card {
+  height: 100%;
+  padding: 1rem;
+  border-radius: 20px;
+  background: rgba(255, 252, 244, 0.92);
+  border: 1px solid rgba(93, 78, 55, 0.1);
+  box-shadow: 0 14px 30px rgba(93, 78, 55, 0.06);
+}
+
+.spectrogram-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 16px;
+  border: 1px solid rgba(47, 125, 78, 0.16);
+  background: #1b1610;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.9rem;
+}
+
+.metric-card {
+  padding: 1rem;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(219, 233, 207, 0.68), rgba(255, 248, 235, 0.92));
+  border: 1px solid rgba(47, 125, 78, 0.12);
+}
+
+.metric-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.metric-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
 .app-panel {
   background: var(--bg-panel);
   border: 1px solid var(--border-soft);
