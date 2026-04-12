@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+
+{% block title %}Contact | ClearTusk{% endblock %}
+
+{% block content %}
+<section class="hero-shell mb-5">
+  <div class="row align-items-center g-4">
+    <div class="col-lg-8">
+      <span class="hero-badge mb-3">Contact Us</span>
+      <h1 class="display-5 fw-semibold">Send a note to the ClearTusk team.</h1>
+      <p class="lead hero-copy mb-0">
+        Use this form for questions, feedback, or collaboration ideas around the elephant call denoising process.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-lg app-panel">
+  <div class="card-body p-4 p-lg-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        {% if status %}
+        <div class="contact-alert {% if status.kind == 'success' %}contact-alert-success{% else %}contact-alert-error{% endif %}">
+          {{ status.message }}
+        </div>
+        {% endif %}
+
+        <form method="post" class="contact-form">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="name">Name</label>
+              <input class="form-control upload-input" type="text" id="name" name="name" value="{{ form_data.name }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="email">Email</label>
+              <input class="form-control upload-input" type="email" id="email" name="email" value="{{ form_data.email }}" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="subject">Subject</label>
+              <input class="form-control upload-input" type="text" id="subject" name="subject" value="{{ form_data.subject }}" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="message">Message</label>
+              <textarea class="form-control upload-input contact-textarea" id="message" name="message" rows="6" required>{{ form_data.message }}</textarea>
+            </div>
+            <div class="col-12">
+              <button class="btn process-btn" type="submit">Send Message</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

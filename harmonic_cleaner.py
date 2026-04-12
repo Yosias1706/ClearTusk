@@ -29,10 +29,18 @@ BASE_WIN_LENGTH = 1024
 
 CALL_TYPE_CONFIGS: dict[str, dict[str, object]] = {
     "rumble": {
+        # Main frequency band we want to preserve for this call type.
         "target_band": (10, 150),
+        # Extra emphasis given to the target band inside the frequency mask.
         "freq_boost": 1.4,
+        # Minimum amount of higher-frequency content allowed through after tapering.
         "upper_taper_floor": 0.40,
         "presets": [
+            # HPSS settings separate smoother call structure from rougher/noisier content.
+            # threshold / softness control how strict and how gentle the noise gate is.
+            # harmonic_blend mixes some harmonic content back in after masking.
+            # percussive_reject subtracts more rough/noisy content.
+            # target_reinject restores a small amount of original target-band sound.
             {"name": "rumble_preserve", "hpss_margin": (1.1, 2.6), "threshold": 1.08, "softness": 1.85, "harmonic_blend": 0.36, "percussive_reject": 0.02, "target_reinject": 0.26},
             {"name": "rumble_conservative", "hpss_margin": (1.2, 3.0), "threshold": 1.20, "softness": 1.50, "harmonic_blend": 0.28, "percussive_reject": 0.03, "target_reinject": 0.18},
             {"name": "rumble_balanced", "hpss_margin": (1.5, 4.0), "threshold": 1.35, "softness": 1.10, "harmonic_blend": 0.15, "percussive_reject": 0.05, "target_reinject": 0.10},
@@ -111,6 +119,16 @@ def band_energy(y: np.ndarray, sr: int, band: tuple[float, float]) -> float:
     return float(np.sum(power[mask]))
 
 
+def get_machine_band(target_band: tuple[float, float]) -> tuple[float, float]:
+    # Score "machine noise" only above the protected call band so we do not
+    # accidentally count preserved elephant sound as noise.
+    low = max(MACHINE_BAND[0], target_band[1] + 25.0)
+    high = MACHINE_BAND[1]
+    if low >= high:
+        low = max(MACHINE_BAND[0], high - 50.0)
+    return float(low), float(high)
+
+
 def average_band_spectrum(y: np.ndarray, sr: int, band: tuple[float, float]) -> np.ndarray:
     n_fft, hop_length, win_length = resolve_stft_params(len(y))
     stft = np.abs(
@@ -146,6 +164,8 @@ def build_frequency_weight(
     freq_boost: float,
     upper_taper_floor: float,
 ) -> np.ndarray:
+    # This mask boosts the target band, tapers higher frequencies instead of
+    # cutting them off completely, and rejects content outside our analysis band.
     weight = np.ones_like(freqs)
     elephant_low, elephant_high = target_band
 
@@ -189,6 +209,8 @@ def match_target_band_energy(
     target_band: tuple[float, float],
     max_ratio: float = 1.0,
 ) -> np.ndarray:
+    # Cap the cleaned clip so it cannot end up with more target-band sound than
+    # the original clip. This keeps the retention metric from being inflated.
     original_energy = band_energy(original, SR, target_band)
     candidate_energy = band_energy(candidate, SR, target_band)
     if candidate_energy <= 0 or original_energy <= 0:
@@ -198,9 +220,14 @@ def match_target_band_energy(
     if candidate_energy <= allowed_energy:
         return candidate
 
-    scale = np.sqrt(allowed_energy / candidate_energy)
-    target_component = extract_target_component(candidate, target_band)
-    adjusted = candidate - target_component + (target_component * scale)
+    adjusted = candidate.astype(np.float32)
+    for _ in range(4):
+        candidate_energy = band_energy(adjusted, SR, target_band)
+        if candidate_energy <= allowed_energy * 1.0001:
+            break
+        scale = np.sqrt(allowed_energy / candidate_energy)
+        target_component = extract_target_component(adjusted, target_band)
+        adjusted = adjusted - target_component + (target_component * scale)
     return adjusted.astype(np.float32)
 
 
@@ -212,6 +239,7 @@ def isolate_elephant_bands(
     freq_boost: float,
     upper_taper_floor: float,
 ) -> np.ndarray:
+    # Read the preset knobs that define how cautious or aggressive this pass is.
     hpss_margin = preset["hpss_margin"]
     noise_gate_threshold = float(preset["threshold"])
     noise_gate_softness = float(preset["softness"])
@@ -219,6 +247,7 @@ def isolate_elephant_bands(
     percussive_reject = float(preset["percussive_reject"])
     target_reinject = float(preset.get("target_reinject", 0.0))
 
+    # Separate smoother harmonic content from rougher/percussive content.
     y_harmonic, y_percussive = librosa.effects.hpss(y, margin=hpss_margin)
     original_target_component = extract_target_component(y, target_band)
     n_fft, hop_length, win_length = resolve_stft_params(len(y_harmonic))
@@ -227,11 +256,14 @@ def isolate_elephant_bands(
     magnitude, phase = librosa.magphase(stft)
     freqs = librosa.fft_frequencies(sr=SR, n_fft=n_fft)
 
+    # Build a harmonic-friendly mask so sustained elephant structure is favored.
     harmonic_peak = ndimage.maximum_filter(magnitude, size=(1, 11))
     harmonic_mask = np.clip(magnitude / (harmonic_peak + 1e-9), 0.0, 1.0)
     harmonic_mask = np.clip((harmonic_mask - 0.18) / 0.82, 0.0, 1.0)
 
     if noise_reference is not None and len(noise_reference) > 0:
+        # If we have a safe-noise clip from the same recording, estimate a local
+        # noise profile and gate the signal against it.
         noise_n_fft, noise_hop_length, noise_win_length = resolve_stft_params(len(noise_reference))
         noise_stft = np.abs(
             librosa.stft(
@@ -258,10 +290,12 @@ def isolate_elephant_bands(
     combined_mask = ndimage.gaussian_filter(combined_mask, sigma=(1.0, 1.0))
     combined_mask = np.clip(combined_mask, 0.0, 1.0)
 
+    # Apply the mask and reconstruct the time-domain signal.
     cleaned_stft = magnitude * combined_mask * phase
     y_clean = librosa.istft(cleaned_stft, hop_length=hop_length, win_length=win_length, length=len(y))
 
-    # Blend a little of the harmonic signal back in so the call body survives aggressive gating.
+    # Blend a little harmonic and target-band content back in so the elephant
+    # call survives aggressive denoising.
     base_mix = max(0.55, 1.0 - harmonic_blend + percussive_reject)
     y_clean = base_mix * y_clean + harmonic_blend * y_harmonic - percussive_reject * y_percussive
     y_clean = y_clean + target_reinject * original_target_component
@@ -270,7 +304,7 @@ def isolate_elephant_bands(
     normalized_cutoff = min(FMAX / (SR * 0.5), 0.95)
     b, a = signal.butter(4, normalized_cutoff, btype="lowpass")
     y_clean = signal.filtfilt(b, a, y_clean)
-    y_clean = match_target_band_energy(y_clean, y, target_band, max_ratio=1.0)
+    y_clean = match_target_band_energy(y_clean, y, target_band, max_ratio=0.999)
 
     peak = np.max(np.abs(y_clean))
     if peak > 0:
@@ -286,6 +320,12 @@ def calculate_metrics(
     context: np.ndarray | None,
     target_band: tuple[float, float],
 ) -> dict[str, float | int | str]:
+    # These metrics are proxies:
+    # retention = how much elephant-band sound stayed,
+    # suppression = how much upper-band machine sound dropped,
+    # ratio gain = whether the elephant stands out more after cleaning,
+    # similarity = whether the target-band sound profile still resembles the original.
+    machine_band = get_machine_band(target_band)
     rms_orig = float(np.sqrt(np.mean(original**2)))
     rms_clean = float(np.sqrt(np.mean(cleaned**2)))
     reduction_pct = (1 - (rms_clean / rms_orig)) * 100 if rms_orig > 0 else 0.0
@@ -301,12 +341,12 @@ def calculate_metrics(
 
     elephant_orig = band_energy(original, SR, target_band)
     elephant_clean = band_energy(cleaned, SR, target_band)
-    machine_orig = band_energy(original, SR, MACHINE_BAND)
-    machine_clean = band_energy(cleaned, SR, MACHINE_BAND)
+    machine_orig = band_energy(original, SR, machine_band)
+    machine_clean = band_energy(cleaned, SR, machine_band)
     rumble_orig = band_energy(original, SR, CORE_RUMBLE_BAND)
     rumble_clean = band_energy(cleaned, SR, CORE_RUMBLE_BAND)
 
-    elephant_retention_pct = (elephant_clean / (elephant_orig + 1e-12)) * 100
+    elephant_retention_pct = min((elephant_clean / (elephant_orig + 1e-12)) * 100, 100.0)
     machine_suppression_pct = (1 - (machine_clean / (machine_orig + 1e-12))) * 100
     emr_gain_db = to_db_ratio(elephant_clean, machine_clean) - to_db_ratio(elephant_orig, machine_orig)
     rumble_retention_pct = (rumble_clean / (rumble_orig + 1e-12)) * 100
@@ -328,12 +368,14 @@ def calculate_metrics(
         "core_rumble_retention_pct": float(rumble_retention_pct),
         "target_band_low_hz": float(target_band[0]),
         "target_band_high_hz": float(target_band[1]),
+        "machine_band_low_hz": float(machine_band[0]),
+        "machine_band_high_hz": float(machine_band[1]),
     }
 
     if noise_reference is not None and len(noise_reference) > 0:
-        noise_orig = band_energy(original, SR, MACHINE_BAND)
-        noise_clean = band_energy(cleaned, SR, MACHINE_BAND)
-        noise_ref_energy = band_energy(noise_reference, SR, MACHINE_BAND)
+        noise_orig = band_energy(original, SR, machine_band)
+        noise_clean = band_energy(cleaned, SR, machine_band)
+        noise_ref_energy = band_energy(noise_reference, SR, machine_band)
         metrics["noise_reference_match_reduction_db"] = (
             to_db_ratio(noise_orig, noise_ref_energy) - to_db_ratio(noise_clean, noise_ref_energy)
         )
@@ -350,6 +392,8 @@ def calculate_metrics(
 
 
 def score_candidate(metrics: dict[str, float | int | str], call_type: str) -> float:
+    # Combine the main preservation and denoising metrics into one score so we
+    # can choose the best preset for each clip automatically.
     target_retention = float(metrics["target_band_retention_pct"])
     suppression = float(metrics["machine_band_suppression_pct"])
     ratio_gain = float(metrics["target_machine_ratio_gain_db"])
@@ -371,6 +415,8 @@ def score_candidate(metrics: dict[str, float | int | str], call_type: str) -> fl
 
 
 def main() -> None:
+    # Batch-process every training clip, try all presets for that clip's call
+    # type, keep the highest-scoring result, and write a full report.
     records: list[dict[str, float | int | str]] = []
     call_type_lookup = get_call_metadata()
 

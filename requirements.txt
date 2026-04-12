@@ -2,7 +2,6 @@ flask
 librosa
 matplotlib
 pandas
-pydub
 soundfile
 scipy
 python-dotenv

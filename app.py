@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import os
 from pathlib import Path
 from uuid import uuid4
@@ -7,11 +8,9 @@ from uuid import uuid4
 import librosa  # noqa: F401
 import matplotlib
 import numpy as np  # noqa: F401
-import pandas as pd
 import soundfile as sf
 from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template, request, url_for
-from scipy import signal  # noqa: F401
+from flask import Flask, abort, jsonify, render_template, request, send_from_directory, url_for
 
 from harmonic_cleaner import (
     CALL_TYPE_CONFIGS,
@@ -32,12 +31,39 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
 UPLOAD_FOLDER = STATIC_DIR / "uploads"
-AUDIO_FOLDER = STATIC_DIR / "audio"
 SPECTROGRAM_FOLDER = STATIC_DIR / "spectrograms"
-METADATA_FILE = BASE_DIR / "metadata.csv"
 ALLOWED_UPLOAD_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
 SPECTROGRAM_MAX_HZ = 700
 SPECTROGRAM_N_FFT = 8192
+CONTACT_MESSAGES_FILE = BASE_DIR / "contact_messages.csv"
+HOME_PAGE_IMAGES = {
+    "plane.png": "No airplane noise",
+    "car.png": "No vehicle noise",
+    "generator.png": "No generator noise",
+}
+SITE_ASSET_FILES = {"elephant.png", *HOME_PAGE_IMAGES.keys()}
+HOME_PAGE_SPECTROGRAM_EXAMPLES = [
+    {
+        "title": "Original Spectrogram 1",
+        "source": BASE_DIR / "Elephant_Training_Snippets" / "call_4.wav",
+        "output": "home_call_4_original.png",
+    },
+    {
+        "title": "Original Spectrogram 2",
+        "source": BASE_DIR / "Elephant_Training_Snippets" / "call_3.wav",
+        "output": "home_call_3_original.png",
+    },
+    {
+        "title": "Cleaned Spectrogram 1",
+        "source": BASE_DIR / "Harmonic_Isolated_Clips_1_1000Hz" / "call_4.wav",
+        "output": "home_call_4_cleaned.png",
+    },
+    {
+        "title": "Cleaned Spectrogram 2",
+        "source": BASE_DIR / "Harmonic_Isolated_Clips_1_1000Hz" / "call_3.wav",
+        "output": "home_call_3_cleaned.png",
+    },
+]
 
 load_dotenv(BASE_DIR / ".env")
 
@@ -48,47 +74,7 @@ app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
 app.config["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "")
 
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
-AUDIO_FOLDER.mkdir(parents=True, exist_ok=True)
 SPECTROGRAM_FOLDER.mkdir(parents=True, exist_ok=True)
-
-
-def apply_bandpass_filter(
-    audio_signal: np.ndarray,
-    sample_rate: int,
-    lowcut: float = 300.0,
-    highcut: float = 3400.0,
-) -> np.ndarray:
-    """Placeholder bandpass filter for future DSP logic."""
-    if audio_signal.size == 0 or sample_rate <= 0:
-        return audio_signal
-
-    nyquist = sample_rate * 0.5
-    low = max(lowcut / nyquist, 1e-6)
-    high = min(highcut / nyquist, 0.999)
-
-    if low >= high:
-        return audio_signal
-
-    b, a = signal.butter(N=4, Wn=[low, high], btype="bandpass")
-    return signal.filtfilt(b, a, audio_signal)
-
-
-def load_metadata() -> list[dict]:
-    if not METADATA_FILE.exists():
-        return []
-
-    df = pd.read_csv(METADATA_FILE)
-    records = df.fillna("").to_dict(orient="records")
-
-    for row in records:
-        raw_filename = str(row.get("raw_file", "")).strip()
-        processed_filename = str(row.get("processed_file", "")).strip()
-        row["raw_url"] = url_for("static", filename=f"audio/{raw_filename}") if raw_filename else ""
-        row["processed_url"] = (
-            url_for("static", filename=f"uploads/{processed_filename}") if processed_filename else ""
-        )
-
-    return records
 
 
 def get_call_config(call_type: str) -> tuple[str, dict[str, object]]:
@@ -98,7 +84,7 @@ def get_call_config(call_type: str) -> tuple[str, dict[str, object]]:
     return normalized, CALL_TYPE_CONFIGS.get(normalized, DEFAULT_CALL_CONFIG)
 
 
-def save_spectrogram(audio_path: Path, prefix: str) -> str:
+def render_spectrogram_image(audio_path: Path, output_path: Path) -> None:
     signal_data, sample_rate = librosa.load(audio_path, sr=None, mono=True)
     if signal_data.size == 0:
         raise ValueError("Uploaded audio is empty.")
@@ -111,9 +97,6 @@ def save_spectrogram(audio_path: Path, prefix: str) -> str:
     display_ticks = np.arange(0, max_display_khz + 0.001, 0.1)
     vmin = float(np.percentile(spectrogram_db, 42))
     vmax = float(np.percentile(spectrogram_db, 99.8))
-
-    output_name = f"{prefix}_{uuid4().hex[:8]}.png"
-    output_path = SPECTROGRAM_FOLDER / output_name
 
     fig, ax = plt.subplots(figsize=(10, 4))
     image = ax.imshow(
@@ -136,7 +119,29 @@ def save_spectrogram(audio_path: Path, prefix: str) -> str:
     fig.savefig(output_path, dpi=180, bbox_inches="tight")
     plt.close(fig)
 
+
+def save_spectrogram(audio_path: Path, prefix: str) -> str:
+    output_name = f"{prefix}_{uuid4().hex[:8]}.png"
+    output_path = SPECTROGRAM_FOLDER / output_name
+    render_spectrogram_image(audio_path, output_path)
+
     return url_for("static", filename=f"spectrograms/{output_name}")
+
+
+def ensure_home_spectrogram_examples() -> list[dict[str, str]]:
+    examples: list[dict[str, str]] = []
+    for example in HOME_PAGE_SPECTROGRAM_EXAMPLES:
+        output_path = SPECTROGRAM_FOLDER / str(example["output"])
+        source_path = Path(example["source"])
+        if source_path.exists():
+            render_spectrogram_image(source_path, output_path)
+            examples.append(
+                {
+                    "title": str(example["title"]),
+                    "image_url": url_for("static", filename=f"spectrograms/{output_path.name}"),
+                }
+            )
+    return examples
 
 
 def clean_uploaded_clip(input_path: Path, call_type: str) -> tuple[str, dict[str, float | int | str], str]:
@@ -186,45 +191,76 @@ def clean_uploaded_clip(input_path: Path, call_type: str) -> tuple[str, dict[str
 
 @app.route("/")
 def home():
-    return render_template("home.html")
+    home_examples = [
+        {
+            "title": title,
+            "image_url": url_for("home_asset", filename=filename),
+        }
+        for filename, title in HOME_PAGE_IMAGES.items()
+    ]
+    spectrogram_examples = ensure_home_spectrogram_examples()
+    return render_template(
+        "home.html",
+        home_examples=home_examples,
+        spectrogram_examples=spectrogram_examples,
+    )
+
+
+@app.route("/home-assets/<path:filename>")
+def home_asset(filename: str):
+    if filename not in SITE_ASSET_FILES:
+        abort(404)
+    return send_from_directory(BASE_DIR, filename)
 
 
 @app.route("/dashboard")
 def index():
-    metadata = load_metadata()
-    return render_template("index.html", metadata=metadata, call_types=["rumble", "trumpet", "roar", "default"])
+    return render_template("index.html", call_types=["rumble", "trumpet", "roar", "default"])
 
 
-@app.route("/process", methods=["POST"])
-def process_audio():
-    payload = request.get_json(silent=True) or {}
-    filename = str(payload.get("filename", "")).strip()
+@app.route("/contact", methods=["GET", "POST"])
+def contact():
+    status = None
+    form_data = {
+        "name": "",
+        "email": "",
+        "subject": "",
+        "message": "",
+    }
 
-    if not filename:
-        return jsonify({"success": False, "error": "No audio file specified."}), 400
+    if request.method == "POST":
+        form_data = {
+            "name": str(request.form.get("name", "")).strip(),
+            "email": str(request.form.get("email", "")).strip(),
+            "subject": str(request.form.get("subject", "")).strip(),
+            "message": str(request.form.get("message", "")).strip(),
+        }
 
-    source_path = AUDIO_FOLDER / filename
-    if not source_path.exists():
-        return jsonify({"success": False, "error": f"Audio file '{filename}' was not found."}), 404
-
-    try:
-        audio_signal, sample_rate = librosa.load(source_path, sr=None, mono=True)
-        filtered_signal = apply_bandpass_filter(audio_signal, sample_rate)
-
-        output_name = f"{source_path.stem}_processed_{uuid4().hex[:8]}.wav"
-        output_path = UPLOAD_FOLDER / output_name
-        sf.write(output_path, filtered_signal, sample_rate)
-
-        return jsonify(
-            {
-                "success": True,
-                "message": "Audio processed successfully.",
-                "processed_file": output_name,
-                "processed_url": url_for("static", filename=f"uploads/{output_name}"),
+        if not all(form_data.values()):
+            status = {
+                "kind": "error",
+                "message": "Please fill out all four fields before sending your message.",
             }
-        )
-    except Exception as exc:  # pragma: no cover
-        return jsonify({"success": False, "error": str(exc)}), 500
+        else:
+            is_new_file = not CONTACT_MESSAGES_FILE.exists()
+            with CONTACT_MESSAGES_FILE.open("a", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["name", "email", "subject", "message"])
+                if is_new_file:
+                    writer.writeheader()
+                writer.writerow(form_data)
+
+            status = {
+                "kind": "success",
+                "message": "Your message has been saved. We’ll be able to review it from this project workspace.",
+            }
+            form_data = {
+                "name": "",
+                "email": "",
+                "subject": "",
+                "message": "",
+            }
+
+    return render_template("contact.html", status=status, form_data=form_data)
 
 
 @app.route("/process-upload", methods=["POST"])
@@ -262,10 +298,18 @@ def process_uploaded_audio():
                 "original_spectrogram_url": original_spectrogram_url,
                 "cleaned_spectrogram_url": cleaned_spectrogram_url,
                 "metrics": {
-                    "Target Retention %": round(float(metrics["target_band_retention_pct"]), 2),
-                    "Machine Suppression %": round(float(metrics["machine_band_suppression_pct"]), 2),
-                    "Target/Machine Gain dB": round(float(metrics["target_machine_ratio_gain_db"]), 2),
-                    "Target Similarity": round(float(metrics["target_band_cosine_similarity"]), 3),
+                    "Target Retention % (how much of the elephant sound was preserved)": round(
+                        float(metrics["target_band_retention_pct"]), 2
+                    ),
+                    "Machine Suppression % (how much machine noise was removed)": round(
+                        float(metrics["machine_band_suppression_pct"]), 2
+                    ),
+                    "Target/Machine Gain dB (how much more the elephant stands out)": round(
+                        float(metrics["target_machine_ratio_gain_db"]), 2
+                    ),
+                    "Target Spectral Similarity (how closely the cleaned call matches the original sound profile)": round(
+                        float(metrics["target_band_cosine_similarity"]), 3
+                    ),
                 },
             }
         )

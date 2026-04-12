@@ -5,25 +5,13 @@
 {% block content %}
 <section class="landing-shell">
   <div class="row align-items-center g-5">
-    <div class="col-lg-6">
-      <span class="hero-badge mb-3">Elephant Voice Isolator</span>
+    <div class="col-lg-8">
       <h1 class="display-4 fw-semibold">Preserve the elephant call. Reduce the machine noise.</h1>
       <p class="lead hero-copy mt-3 mb-4">
-        ClearTusk is a research-facing workspace for denoising elephant recordings contaminated by airplanes,
-        cars, and generators while protecting the shape of the original vocalization.
+        Background noise from airplanes, vehicles, and generators can ruin wildlife data. ClearTusk helps clean those recordings while preserving the elephant sound.
       </p>
       <div class="d-flex flex-column flex-sm-row gap-3">
-        <a class="btn landing-cta" href="{{ url_for('index') }}">Open Field Dashboard</a>
-      </div>
-    </div>
-    <div class="col-lg-6">
-      <div class="hero-card landing-feature-card">
-        <div class="hero-card-label">Workspace</div>
-        <div class="hero-card-title">Move from field recording to cleaner elephant-call output.</div>
-        <p class="mb-0">
-          Use the dashboard to inspect recordings, preview waveforms, and test denoising steps without
-          any third-party login flow in the way.
-        </p>
+        <a class="btn landing-cta" href="{{ url_for('index') }}">Open Audio Intake</a>
       </div>
     </div>
   </div>
@@ -34,18 +22,18 @@
     <div class="col-md-4">
       <div class="info-card h-100">
         <div class="info-step">01</div>
-        <h2 class="h5 mb-2">Load Recordings</h2>
+        <h2 class="h5 mb-2">Upload Recordings</h2>
         <p class="section-copy mb-0">
-          Bring in elephant recordings, spreadsheet metadata, and supporting spectrogram assets.
+          Upload an elephant recording that contains overlapping machine noise.
         </p>
       </div>
     </div>
     <div class="col-md-4">
       <div class="info-card h-100">
         <div class="info-step">02</div>
-        <h2 class="h5 mb-2">Process Carefully</h2>
+        <h2 class="h5 mb-2">Select Call Type</h2>
         <p class="section-copy mb-0">
-          Test denoising strategies intended to suppress human-made overlap without flattening the call.
+          Choose the elephant call type you want the cleaner to preserve.
         </p>
       </div>
     </div>
@@ -54,10 +42,48 @@
         <div class="info-step">03</div>
         <h2 class="h5 mb-2">Review Outputs</h2>
         <p class="section-copy mb-0">
-          Compare raw and processed audio so researchers can judge whether preservation quality is good enough.
+          Compare the original and cleaned audio, spectrograms, and metrics to judge the result.
         </p>
       </div>
     </div>
+  </div>
+</section>
+
+<section class="mt-5">
+  <div class="mb-4">
+    <h2 class="h3 mb-2">Cleaner Elephant Voices</h2>
+    <p class="section-copy mb-0">
+      Example outputs showing different kinds of machine noise removed.
+    </p>
+  </div>
+  <div class="row g-4">
+    {% for example in home_examples %}
+    <div class="col-md-4">
+      <div class="showcase-card h-100">
+        <h3 class="h5 mb-3">{{ example.title }}</h3>
+        <img src="{{ example.image_url }}" alt="{{ example.title }}" class="showcase-image showcase-image-uniform">
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="mt-5">
+  <div class="mb-4">
+    <h2 class="h3 mb-2">Spectrogram Examples</h2>
+    <p class="section-copy mb-0">
+      Two stronger before-and-after examples from the current cleaner output.
+    </p>
+  </div>
+  <div class="row g-4">
+    {% for example in spectrogram_examples %}
+    <div class="col-md-6">
+      <div class="showcase-card h-100">
+        <h3 class="h5 mb-3">{{ example.title }}</h3>
+        <img src="{{ example.image_url }}" alt="{{ example.title }}" class="showcase-image">
+      </div>
+    </div>
+    {% endfor %}
   </div>
 </section>
 {% endblock %}
