@@ -8,7 +8,6 @@ version = "1.0.0"
 description = "Isolate elephant vocalisations from machine noise in field recordings, with detection and analytics."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
 authors = [{ name = "Yosias Redi" }]
 keywords = ["bioacoustics", "audio", "denoising", "elephant", "conservation", "flask"]
 classifiers = [
@@ -47,9 +46,6 @@ dev = [
 
 [project.scripts]
 cleartusk = "cleartusk.cli:main"
-
-[project.urls]
-Homepage = "https://github.com/yosiasredi/cleartusk"
 
 [tool.setuptools.packages.find]
 include = ["cleartusk*"]
