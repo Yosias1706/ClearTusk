@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Runs · ClearTusk{% endblock %}
+
+{% block content %}
+<section class="shell section-tight">
+  <div class="row-between">
+    <div>
+      <p class="eyebrow">History</p>
+      <h1>Processing runs</h1>
+      <p class="lead">
+        Every upload is stored with its metrics, detections, and artifacts, so any result can be
+        reopened later.
+      </p>
+    </div>
+    <div class="grid grid-2" style="min-width: 300px;">
+      <div class="stat"><div class="stat__label">Runs</div><div class="stat__value">{{ totals.runs_total }}</div></div>
+      <div class="stat"><div class="stat__label">Audio processed</div><div class="stat__value">{{ totals.audio_processed_minutes }}<small>min</small></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="shell" style="padding-bottom: 3rem;">
+  <div class="chip-row" style="margin-bottom: 1rem;">
+    <a class="chip {% if not call_type %}is-active{% endif %}" href="{{ url_for('site.runs') }}">All</a>
+    {% for name in call_types %}
+    <a class="chip {% if call_type == name %}is-active{% endif %}" href="{{ url_for('site.runs', call_type=name) }}">{{ name|title }}</a>
+    {% endfor %}
+  </div>
+
+  {% if runs %}
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Recording</th><th>When</th><th>Profile</th><th>Preset</th>
+          <th class="num">Retention</th><th class="num">Suppression</th><th class="num">Gain</th>
+          <th class="num">Fidelity</th><th class="num">Events</th><th class="num">Latency</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in runs %}
+        <tr>
+          <td><strong>{{ run.filename }}</strong><div class="text-muted" style="font-size: 0.8rem;">{{ run.audio_seconds }}s audio</div></td>
+          <td>{{ run.created_at|timeago }}</td>
+          <td>
+            <span class="badge badge-accent">{{ run.call_type }}</span>
+            {% if run.call_type_source == 'auto' %}<span class="badge">auto</span>{% endif %}
+          </td>
+          <td class="mono">{{ run.preset }}</td>
+          <td class="num">{{ run.retention if run.retention is not none else '—' }}%</td>
+          <td class="num">{{ run.suppression if run.suppression is not none else '—' }}%</td>
+          <td class="num">+{{ run.gain_db if run.gain_db is not none else '—' }} dB</td>
+          <td class="num">{{ run.fidelity if run.fidelity is not none else '—' }}</td>
+          <td class="num">{{ run.events }}</td>
+          <td class="num">{{ run.duration_ms|number }} ms</td>
+          <td><a class="btn btn-ghost btn-sm" href="{{ url_for('site.run_detail', public_id=run.id) }}">Open</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="row-between" style="margin-top: 1rem;">
+    <div class="text-muted">Page {{ page }}</div>
+    <div class="row">
+      {% if page > 1 %}<a class="btn btn-ghost btn-sm" href="{{ url_for('site.runs', page=page-1, call_type=call_type) }}">← Newer</a>{% endif %}
+      {% if has_next %}<a class="btn btn-ghost btn-sm" href="{{ url_for('site.runs', page=page+1, call_type=call_type) }}">Older →</a>{% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="empty">
+    <h3>No runs yet</h3>
+    <p>Process a recording in the studio and it will show up here.</p>
+    <a class="btn btn-primary" href="{{ url_for('site.studio') }}">Open the studio</a>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

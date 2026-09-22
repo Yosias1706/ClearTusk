@@ -1,6 +1,20 @@
-flask
-librosa
-matplotlib
-pandas
-soundfile
-scipy
+# Pinned floor versions for a reproducible install.
+# `pip install -e ".[postgres,server,dev]"` is the supported path; this file
+# exists for environments that expect a plain requirements file.
+flask>=3.0
+sqlalchemy>=2.0
+alembic>=1.13
+pydantic-settings>=2.2
+librosa>=0.10
+soundfile>=0.12
+scipy>=1.11
+numpy>=1.26
+pandas>=2.1
+matplotlib>=3.8
+scikit-learn>=1.4
+joblib>=1.3
+pydub>=0.25
+click>=8.1
+python-dotenv>=1.0
+psycopg[binary]>=3.1
+gunicorn>=21.2

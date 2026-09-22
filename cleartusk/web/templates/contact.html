@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Contact · ClearTusk{% endblock %}
+
+{% block content %}
+<section class="shell section-tight">
+  <p class="eyebrow">Contact</p>
+  <h1>Get in touch</h1>
+  <p class="lead">
+    Questions about the pipeline, the metrics, or collaborating on a larger corpus — messages are
+    stored in the project database.
+  </p>
+</section>
+
+<section class="shell" style="padding-bottom: 4rem;">
+  <div class="grid" style="grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); align-items: start;">
+    <form class="card card-lg" method="post" novalidate>
+      {% if status %}
+      <div class="alert {{ 'alert-success' if status.kind == 'success' else 'alert-error' }}" style="margin-bottom: 1.25rem;">
+        {{ status.message }}
+      </div>
+      {% endif %}
+      <div class="grid grid-2" style="gap: 0 1rem;">
+        <div class="field">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" value="{{ form.name }}" required autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" value="{{ form.email }}" required autocomplete="email">
+        </div>
+      </div>
+      <div class="field">
+        <label for="subject">Subject</label>
+        <input type="text" id="subject" name="subject" value="{{ form.subject }}" required>
+      </div>
+      <div class="field">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" required>{{ form.message }}</textarea>
+      </div>
+      <button class="btn btn-primary" type="submit">Send message</button>
+    </form>
+
+    <aside class="card stack">
+      <h3>About the project</h3>
+      <p class="text-secondary" style="font-size: 0.93rem;">
+        ClearTusk is a research prototype: a signal-processing denoiser tuned for elephant
+        vocalisations, a call detector trained on annotated field recordings, and the analytics
+        needed to tell whether a change to either actually helped.
+      </p>
+      <dl class="kv">
+        <dt>Storage</dt><dd>{{ database_backend }}</dd>
+        <dt>Detector</dt><dd>{{ "online" if detector_available else "not trained" }}</dd>
+        <dt>Version</dt><dd>{{ app_version }}</dd>
+      </dl>
+      <a class="btn btn-ghost" href="{{ url_for('site.analytics') }}">See the analytics</a>
+    </aside>
+  </div>
+</section>
+{% endblock %}

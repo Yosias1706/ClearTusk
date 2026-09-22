@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} · ClearTusk{% endblock %}
+{% block content %}
+<section class="shell section">
+  <div class="card card-lg" style="max-width: 640px; margin-inline: auto; text-align: center;">
+    <p class="eyebrow">Error {{ code }}</p>
+    <h1>{{ message }}</h1>
+    <p class="lead" style="margin-inline: auto;">Try again, or head back to a working page.</p>
+    <div class="row" style="justify-content: center;">
+      <a class="btn btn-primary" href="{{ url_for('site.home') }}">Back to overview</a>
+      <a class="btn btn-ghost" href="{{ url_for('site.studio') }}">Open the studio</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

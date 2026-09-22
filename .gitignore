@@ -1,4 +1,21 @@
-.venv/
+# Python
 __pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environment
 .env
-app.db
+
+# Runtime artifacts (uploads, spectrograms, models, reports, local DB)
+data/runtime/
+
+# OS
+.DS_Store

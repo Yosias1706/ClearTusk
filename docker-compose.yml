@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cleartusk
+      POSTGRES_PASSWORD: cleartusk
+      POSTGRES_DB: cleartusk
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cleartusk"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  web:
+    build: .
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      CLEARTUSK_DATABASE_URL: postgresql+psycopg://cleartusk:cleartusk@db:5432/cleartusk
+      CLEARTUSK_SECRET_KEY: ${CLEARTUSK_SECRET_KEY:-change-me}
+      CLEARTUSK_ENVIRONMENT: docker
+      CLEARTUSK_DATA_DIR: /app/data
+    ports: ["8000:8000"]
+    volumes:
+      # The corpus stays on the host; generated artifacts live in a named volume.
+      - ./data/corpus:/app/data/corpus:ro
+      - runtime:/var/lib/cleartusk
+    command: >
+      sh -c "alembic upgrade head &&
+             gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 180 wsgi:app"
+
+volumes:
+  pgdata:
+  runtime:

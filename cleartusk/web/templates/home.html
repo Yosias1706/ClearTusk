@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}ClearTusk · Hear the elephant, not the engine{% endblock %}
+
+{% block content %}
+<section class="shell hero">
+  <div class="hero__grid">
+    <div>
+      <p class="eyebrow">Bioacoustic signal recovery</p>
+      <h1>Hear the elephant, not the engine.</h1>
+      <p class="lead">
+        Aircraft, vehicles, and camp generators bleed straight into the band elephants
+        talk in. ClearTusk detects each call, strips the machine noise around it, and
+        reports exactly how much of the vocalisation survived.
+      </p>
+      <div class="row" style="margin-top: 1.5rem;">
+        <a class="btn btn-primary" href="{{ url_for('site.studio') }}">Clean a recording</a>
+        <a class="btn btn-ghost" href="{{ url_for('site.analytics') }}">See the numbers</a>
+      </div>
+      <div class="chip-row" style="margin-top: 1.5rem;">
+        <span class="chip">{{ overview.corpus_clips }} annotated calls</span>
+        <span class="chip">{{ overview.corpus_recordings }} field recordings</span>
+        {% if detector %}<span class="chip">Detector ROC-AUC {{ detector.roc_auc|round(3) }}</span>{% endif %}
+      </div>
+    </div>
+
+    {% if showcase.available %}
+    <figure class="hero__panel" style="margin: 0;">
+      <div class="spectrogram">
+        <img src="{{ media_url(showcase.comparison_key) }}" alt="Spectrogram of {{ showcase.clip_name }} before and after cleaning, on a shared decibel scale">
+      </div>
+      <figcaption>
+        <strong>{{ showcase.clip_name }}</strong> — {{ showcase.call_type }} recorded over
+        {{ showcase.noise_source }} noise. Same colour scale in both panels.
+      </figcaption>
+      <div class="compare" style="margin-top: 0.9rem;">
+        <div>
+          <span class="badge">Original</span>
+          <audio class="player" controls preload="none" src="{{ media_url(showcase.original_audio_key) }}"></audio>
+        </div>
+        <div>
+          <span class="badge badge-accent">Cleaned</span>
+          <audio class="player" controls preload="none" src="{{ media_url(showcase.cleaned_audio_key) }}"></audio>
+        </div>
+      </div>
+    </figure>
+    {% else %}
+    <div class="hero__panel empty">
+      <p>Run <code>cleartusk prepare-corpus</code> to generate the example showcase.</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="shell section-tight">
+  <div class="grid grid-4">
+    <div class="stat stat--accent">
+      <div class="stat__label">Call retained</div>
+      <div class="stat__value">{{ overview.avg_target_retention_pct }}<small>%</small></div>
+      <div class="stat__note">Mean protected-band energy kept across the corpus sweep</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">Machine noise removed</div>
+      <div class="stat__value">{{ overview.avg_machine_suppression_pct }}<small>%</small></div>
+      <div class="stat__note">Energy cut above the protected band</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">Call-to-noise gain</div>
+      <div class="stat__value">+{{ overview.avg_gain_db }}<small>dB</small></div>
+      <div class="stat__note">How much further the call stands out afterwards</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">Spectral fidelity</div>
+      <div class="stat__value">{{ overview.avg_spectral_fidelity }}</div>
+      <div class="stat__note">Cosine similarity of the in-band spectrum, 1.0 = untouched</div>
+    </div>
+  </div>
+</section>
+
+<section class="shell section">
+  <p class="eyebrow">How it works</p>
+  <h2>Four stages, every one measured</h2>
+  <div class="grid grid-4" style="margin-top: 1.5rem;">
+    <div class="card stack">
+      <div class="step"><span class="step__index">01</span><div><h3>Detect</h3></div></div>
+      <p>A gradient-boosted classifier sweeps 1.5-second windows and marks where calls actually occur, with a confidence per event.</p>
+    </div>
+    <div class="card stack">
+      <div class="step"><span class="step__index">02</span><div><h3>Profile</h3></div></div>
+      <p>The dominant event picks the call profile — rumble, roar, or trumpet — which fixes the frequency band that must be protected.</p>
+    </div>
+    <div class="card stack">
+      <div class="step"><span class="step__index">03</span><div><h3>Isolate</h3></div></div>
+      <p>Harmonic/percussive separation, ridge masking, and a noise gate run once per preset; the highest scoring candidate wins.</p>
+    </div>
+    <div class="card stack">
+      <div class="step"><span class="step__index">04</span><div><h3>Score</h3></div></div>
+      <p>Retention, suppression, call-to-noise gain, and spectral fidelity are stored with every run so quality is tracked over time.</p>
+    </div>
+  </div>
+</section>
+
+<section class="shell section-tight">
+  <p class="eyebrow">What gets in the way</p>
+  <h2>The noise this corpus actually contains</h2>
+  <div class="grid grid-3" style="margin-top: 1.5rem;">
+    {% for source in corpus.by_noise_source %}
+    <div class="card row-between">
+      <div>
+        <div class="stat__label">{{ source.noise_source|title }}</div>
+        <div class="stat__value" style="font-size: 1.6rem;">{{ source.clips }}<small>clips</small></div>
+      </div>
+      <div class="text-muted">{{ source.minutes }} min</div>
+    </div>
+    {% else %}
+    <div class="empty">Ingest the corpus to see its composition.</div>
+    {% endfor %}
+  </div>
+  <div class="grid grid-3" style="margin-top: 1.25rem;">
+    {% for image, title, blurb in noise_showcase %}
+    <figure class="card" style="margin: 0;">
+      <img src="{{ url_for('static', filename='img/' ~ image) }}" alt="{{ title }}" style="border-radius: var(--radius-sm); height: 160px; object-fit: contain; width: 100%; background: var(--surface-2); padding: 0.5rem;">
+      <figcaption style="margin-top: 0.75rem;">
+        <strong>{{ title }}</strong>
+        <div class="text-muted" style="font-size: 0.9rem;">{{ blurb }}</div>
+      </figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+</section>
+
+{% if detector %}
+<section class="shell section">
+  <div class="card card-lg">
+    <div class="card-head">
+      <div>
+        <p class="eyebrow">Call detector</p>
+        <h2 style="margin: 0;">Validated on recordings the model never saw</h2>
+        <p class="text-secondary" style="max-width: 62ch;">
+          {{ detector.sample_count }} windows ({{ detector.positive_count }} call /
+          {{ detector.negative_count }} noise) from the annotated corpus, scored with
+          {{ detector.cv_folds }}-fold cross-validation grouped by source recording — so no
+          field site appears in both the training and test halves of a fold.
+        </p>
+      </div>
+      <span class="badge badge-accent">{{ detector.algorithm }}</span>
+    </div>
+    <div class="grid grid-4">
+      <div class="stat"><div class="stat__label">ROC-AUC</div><div class="stat__value">{{ detector.roc_auc|round(3) }}</div></div>
+      <div class="stat"><div class="stat__label">Accuracy</div><div class="stat__value">{{ (detector.accuracy * 100)|round(1) }}<small>%</small></div></div>
+      <div class="stat"><div class="stat__label">Recall</div><div class="stat__value">{{ (detector.recall * 100)|round(1) }}<small>%</small></div></div>
+      <div class="stat"><div class="stat__label">F1</div><div class="stat__value">{{ detector.f1|round(3) }}</div></div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="shell section">
+  <div class="card card-lg" style="text-align: center;">
+    <h2>Bring your own recording</h2>
+    <p class="lead" style="margin-inline: auto;">
+      Upload a WAV, MP3, FLAC, OGG, or M4A file. ClearTusk finds the calls, cleans the audio,
+      and hands back both files plus a full metric breakdown.
+    </p>
+    <a class="btn btn-primary" href="{{ url_for('site.studio') }}">Open the studio</a>
+  </div>
+</section>
+{% endblock %}

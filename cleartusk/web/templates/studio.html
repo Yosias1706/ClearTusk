@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Studio · ClearTusk{% endblock %}
+
+{% block content %}
+<section class="shell section-tight">
+  <p class="eyebrow">Processing studio</p>
+  <h1>Clean a field recording</h1>
+  <p class="lead">
+    Upload audio and ClearTusk will detect the calls, pick a profile, run every preset for
+    that profile, and keep the best result. Leave the call type on <strong>auto</strong>
+    unless you already know what you are looking at.
+  </p>
+</section>
+
+<section class="shell" style="padding-bottom: 3rem;">
+  <div class="grid" style="grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); align-items: start;">
+    <form class="card card-lg" id="upload-form" enctype="multipart/form-data">
+      <h3>Input</h3>
+      <div class="field">
+        <label for="audio_file">Audio file</label>
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-controls="audio_file"
+             aria-label="Choose an audio file or drop one here">
+          <div class="dropzone__icon" aria-hidden="true">🎧</div>
+          <div>Drop a recording here or <u>browse</u></div>
+          <div class="text-muted" style="font-size: 0.82rem;">
+            {{ allowed_extensions|join(', ') }} · up to {{ max_upload_mb }} MB
+          </div>
+          <div class="dropzone__name" id="file-name" hidden></div>
+        </div>
+        <input class="visually-hidden" type="file" id="audio_file" name="audio_file"
+               accept="{{ allowed_extensions|join(',') }}" required>
+      </div>
+
+      <div class="field">
+        <label for="call_type">Call profile</label>
+        <select id="call_type" name="call_type">
+          <option value="auto" selected>Auto-detect (recommended)</option>
+          {% for profile in profiles %}
+          <option value="{{ profile.name }}">
+            {{ profile.display_name }} · {{ profile.target_band[0]|int }}–{{ profile.target_band[1]|int }} Hz
+          </option>
+          {% endfor %}
+        </select>
+        <p class="hint" id="profile-hint">Auto-detection uses the detected call events, then falls back to the spectral balance of the clip.</p>
+      </div>
+
+      <button class="btn btn-primary" type="submit" id="submit-btn" style="width: 100%;">Detect &amp; clean</button>
+      <div class="progress" id="progress" hidden style="margin-top: 0.9rem;"><div class="progress__bar" id="progress-bar"></div></div>
+      <p class="hint" id="status" role="status" aria-live="polite" style="min-height: 1.2rem;"></p>
+
+      {% if not detector_available %}
+      <div class="alert alert-info" style="margin-top: 0.75rem;">
+        The call detector is not trained in this environment, so auto-detection falls back to a
+        spectral heuristic. Run <code>cleartusk train-detector</code> to enable it.
+      </div>
+      {% endif %}
+    </form>
+
+    <div id="results" hidden class="stack">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">Result</p>
+            <h3 id="result-filename">—</h3>
+            <p class="text-muted" id="result-meta">—</p>
+          </div>
+          <div class="row">
+            <a class="btn btn-ghost btn-sm" id="permalink" href="#">Permalink</a>
+            <a class="btn btn-primary btn-sm" id="download" href="#" download>Download cleaned</a>
+          </div>
+        </div>
+
+        <div class="metric-grid" id="metric-grid"></div>
+      </div>
+
+      <div class="card" id="detection-card">
+        <div class="card-head">
+          <div>
+            <h3>Detected calls</h3>
+            <p class="text-muted" id="detection-summary">—</p>
+          </div>
+          <span class="badge badge-amber" id="detection-badge">—</span>
+        </div>
+        <div class="chart-card">
+          <div class="chart-frame" style="height: 200px;"><canvas id="detection-chart"></canvas></div>
+          <p class="text-muted" style="font-size: 0.84rem; margin: 0;">
+            Call probability per 1.5-second window. Shaded spans are the merged events written to the database.
+          </p>
+        </div>
+        <div class="table-wrap" style="margin-top: 0.9rem;">
+          <table class="data">
+            <thead><tr><th>#</th><th>Start</th><th>End</th><th class="num">Duration</th><th class="num">Confidence</th><th>Peak</th><th>Type</th></tr></thead>
+            <tbody id="detection-rows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Listen</h3>
+        <div class="compare">
+          <div>
+            <span class="badge">Original</span>
+            <audio class="player" id="audio-original" controls preload="none"></audio>
+          </div>
+          <div>
+            <span class="badge badge-accent">Cleaned</span>
+            <audio class="player" id="audio-cleaned" controls preload="none"></audio>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Spectrograms</h3>
+            <p class="text-muted">Both panels share one decibel scale, so the difference you see is real.</p>
+          </div>
+        </div>
+        <div class="spectrogram"><img id="spectrogram-comparison" alt="Original and cleaned spectrograms"></div>
+      </div>
+    </div>
+
+    <div id="placeholder" class="empty">
+      <h3>Nothing processed yet</h3>
+      <p>Pick a recording on the left. Results, detected events, and metrics will appear here.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/studio.js') }}"></script>
+{% endblock %}

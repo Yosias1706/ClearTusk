@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}{{ run.recording.original_filename }} · ClearTusk{% endblock %}
+
+{% block content %}
+<section class="shell section-tight">
+  <p class="eyebrow"><a href="{{ url_for('site.runs') }}">Runs</a> / {{ run.public_id[:8] }}</p>
+  <div class="row-between">
+    <div>
+      <h1 style="word-break: break-all;">{{ run.recording.original_filename }}</h1>
+      <p class="text-muted">
+        Processed {{ run.created_at|timeago }} · {{ run.audio_seconds|round(2) }} s of audio ·
+        {{ run.duration_ms|number }} ms wall time ·
+        {{ run.realtime_factor|round(1) if run.realtime_factor else '—' }}× real time
+      </p>
+    </div>
+    <div class="row">
+      <a class="btn btn-ghost" href="{{ media_url(run.recording.storage_key) }}" download>Original</a>
+      <a class="btn btn-primary" href="{{ media_url(run.cleaned_key) }}" download>Cleaned audio</a>
+    </div>
+  </div>
+</section>
+
+<section class="shell" style="padding-bottom: 3rem;">
+  <div class="grid" style="grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); align-items: start;">
+    <div class="stack">
+      {% if run.metrics %}
+      <div class="card">
+        <h3>Quality</h3>
+        <div class="metric-grid">
+          <div class="metric">
+            <div class="metric__label">Call retained</div>
+            <div class="metric__value">{{ run.metrics.target_retention_pct|round(1) }}%</div>
+            <div class="meter"><div class="meter__fill" style="width: {{ run.metrics.target_retention_pct|round(1) }}%"></div></div>
+            <div class="metric__hint">{{ run.metrics.target_band_low_hz|int }}–{{ run.metrics.target_band_high_hz|int }} Hz protected band</div>
+          </div>
+          <div class="metric">
+            <div class="metric__label">Machine removed</div>
+            <div class="metric__value">{{ run.metrics.machine_suppression_pct|round(1) }}%</div>
+            <div class="meter"><div class="meter__fill" style="width: {{ run.metrics.machine_suppression_pct|round(1) }}%"></div></div>
+            <div class="metric__hint">{{ run.metrics.machine_band_low_hz|int }}–{{ run.metrics.machine_band_high_hz|int }} Hz noise band</div>
+          </div>
+          <div class="metric">
+            <div class="metric__label">Call-to-noise gain</div>
+            <div class="metric__value">+{{ run.metrics.target_machine_gain_db|round(2) }} dB</div>
+            <div class="metric__hint">Improvement in band ratio</div>
+          </div>
+          <div class="metric">
+            <div class="metric__label">Spectral fidelity</div>
+            <div class="metric__value">{{ run.metrics.spectral_fidelity|round(3) }}</div>
+            <div class="metric__hint">1.0 means the in-band spectrum is unchanged</div>
+          </div>
+          <div class="metric">
+            <div class="metric__label">Peak frequency</div>
+            <div class="metric__value">{{ run.metrics.peak_frequency_hz|round(1) }} Hz</div>
+            <div class="metric__hint">{{ "inside" if run.metrics.peak_in_target_band else "outside" }} the protected band</div>
+          </div>
+          <div class="metric">
+            <div class="metric__label">Core rumble kept</div>
+            <div class="metric__value">{{ run.metrics.core_rumble_retention_pct|round(1) }}%</div>
+            <div class="metric__hint">10–150 Hz, profile independent</div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="card">
+        <h3>Listen</h3>
+        <div class="compare">
+          <div>
+            <span class="badge">Original</span>
+            <audio class="player" controls preload="none" src="{{ media_url(run.recording.storage_key) }}"></audio>
+          </div>
+          <div>
+            <span class="badge badge-accent">Cleaned</span>
+            <audio class="player" controls preload="none" src="{{ media_url(run.cleaned_key) }}"></audio>
+          </div>
+        </div>
+      </div>
+
+      {% if run.comparison_spectrogram_key %}
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Before and after</h3>
+            <p class="text-muted">Shared decibel scale; shaded spans are detected call events.</p>
+          </div>
+        </div>
+        <div class="spectrogram"><img src="{{ media_url(run.comparison_spectrogram_key) }}" alt="Original and cleaned spectrograms for this run"></div>
+      </div>
+      {% endif %}
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Detected calls</h3>
+            <p class="text-muted">
+              {{ detections|length }} event{{ '' if detections|length == 1 else 's' }}
+              {% if run.detector_model %}from <code>{{ run.detector_model }}</code>{% else %}(detector unavailable at run time){% endif %}
+            </p>
+          </div>
+        </div>
+        {% if detections %}
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>#</th><th class="num">Start</th><th class="num">End</th><th class="num">Duration</th><th class="num">Confidence</th><th class="num">Peak</th><th>Type</th></tr></thead>
+            <tbody>
+              {% for event in detections %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td class="num">{{ event.start_seconds|round(2) }} s</td>
+                <td class="num">{{ event.end_seconds|round(2) }} s</td>
+                <td class="num">{{ (event.end_seconds - event.start_seconds)|round(2) }} s</td>
+                <td class="num">{{ (event.confidence * 100)|round(1) }}%</td>
+                <td class="num">{{ event.peak_frequency_hz|round(1) }} Hz</td>
+                <td><span class="badge badge-accent">{{ event.predicted_call_type }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted">No call events crossed the detection threshold in this recording.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <aside class="stack">
+      <div class="card">
+        <h3>Run</h3>
+        <dl class="kv">
+          <dt>Status</dt><dd><span class="badge badge-accent">{{ run.status }}</span></dd>
+          <dt>Profile</dt><dd>{{ run.resolved_call_type }}{% if profile %} ({{ profile.target_band[0]|int }}–{{ profile.target_band[1]|int }} Hz){% endif %}</dd>
+          <dt>Chosen by</dt><dd>{{ run.call_type_source }}</dd>
+          <dt>Requested</dt><dd>{{ run.requested_call_type }}</dd>
+          <dt>Preset</dt><dd class="mono">{{ run.selected_preset }}</dd>
+          <dt>Candidates</dt><dd>{{ run.preset_candidates }}</dd>
+          <dt>Score</dt><dd>{{ run.candidate_score|round(2) }}</dd>
+          <dt>Events</dt><dd>{{ run.detection_event_count }}</dd>
+          <dt>Peak conf.</dt><dd>{{ (run.detection_peak_confidence * 100)|round(1) if run.detection_peak_confidence else '—' }}%</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h3>Source audio</h3>
+        <dl class="kv">
+          <dt>Duration</dt><dd>{{ run.recording.duration_seconds|round(2) }} s</dd>
+          <dt>Sample rate</dt><dd>{{ run.recording.sample_rate|number }} Hz</dd>
+          <dt>Channels</dt><dd>{{ run.recording.channels }}</dd>
+          <dt>Size</dt><dd>{{ (run.recording.size_bytes / 1024 / 1024)|round(2) }} MB</dd>
+          <dt>Format</dt><dd>{{ run.recording.media_type }}</dd>
+          <dt>SHA-256</dt><dd class="mono" style="word-break: break-all; font-weight: 400;">{{ run.recording.content_hash[:16] }}…</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h3>API</h3>
+        <p class="text-muted" style="font-size: 0.88rem;">Fetch this run as JSON:</p>
+        <code style="word-break: break-all;">GET /api/v1/runs/{{ run.public_id }}</code>
+      </div>
+    </aside>
+  </div>
+</section>
+{% endblock %}

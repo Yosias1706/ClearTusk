@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+{% block title %}Analytics · ClearTusk{% endblock %}
+
+{% set o = data.overview %}
+{% set p = data.performance %}
+
+{% block content %}
+<section class="shell section-tight">
+  <div class="row-between">
+    <div>
+      <p class="eyebrow">Analytics</p>
+      <h1>How well is ClearTusk working?</h1>
+      <p class="lead">
+        Everything here is computed from the database: the corpus benchmark sweep, every
+        processing run, and the cross-validated detector scorecard.
+      </p>
+    </div>
+    <div class="row">
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('api.analytics') }}">Raw JSON</a>
+    </div>
+  </div>
+</section>
+
+<section class="shell section-tight">
+  <div class="grid grid-4">
+    <div class="stat stat--accent">
+      <div class="stat__label">Call retained</div>
+      <div class="stat__value">{{ o.avg_target_retention_pct }}<small>%</small></div>
+      <div class="stat__note">Mean across {{ o.benchmark_clip_count }} benchmark clips</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">Machine removed</div>
+      <div class="stat__value">{{ o.avg_machine_suppression_pct }}<small>%</small></div>
+      <div class="stat__note">Energy above the protected band</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">Call-to-noise gain</div>
+      <div class="stat__value">+{{ o.avg_gain_db }}<small>dB</small></div>
+      <div class="stat__note">Band-ratio improvement</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">Spectral fidelity</div>
+      <div class="stat__value">{{ o.avg_spectral_fidelity }}</div>
+      <div class="stat__note">In-band cosine similarity</div>
+    </div>
+  </div>
+  <div class="grid grid-4" style="margin-top: 1.25rem;">
+    <div class="stat">
+      <div class="stat__label">Batch throughput</div>
+      <div class="stat__value">{{ p.batch_realtime_factor }}<small>× real time</small></div>
+      <div class="stat__note">{{ p.batch_clips_per_minute|number }} clips/min on {{ p.batch_workers }} workers</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">Interactive latency</div>
+      {% if p.run_count %}
+      <div class="stat__value">{{ p.latency_p50_ms|number }}<small>ms p50</small></div>
+      <div class="stat__note">p95 {{ p.latency_p95_ms|number }} ms over {{ p.run_count }} runs</div>
+      {% else %}
+      <div class="stat__value">—</div>
+      <div class="stat__note">No studio runs recorded yet</div>
+      {% endif %}
+    </div>
+    <div class="stat">
+      <div class="stat__label">Audio processed</div>
+      <div class="stat__value">{{ o.audio_processed_minutes }}<small>min</small></div>
+      <div class="stat__note">{{ o.runs_total }} runs · {{ o.success_rate_pct }}% succeeded</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">Calls detected</div>
+      <div class="stat__value">{{ o.detections_total }}</div>
+      <div class="stat__note">Events written across all runs</div>
+    </div>
+  </div>
+</section>
+
+<section class="shell section-tight">
+  <div class="grid grid-2">
+    <div class="card chart-card">
+      <div class="card-head">
+        <div>
+          <h3>Quality by call profile</h3>
+          <p class="text-muted">Mean retention and suppression for each profile in the latest sweep.</p>
+        </div>
+      </div>
+      <div class="chart-legend" id="legend-call-type"></div>
+      <div class="chart-frame"><canvas id="chart-call-type"></canvas></div>
+      <details class="data-table">
+        <summary>Show data table</summary>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Profile</th><th class="num">Clips</th><th class="num">Retention</th><th class="num">Suppression</th><th class="num">Gain</th><th class="num">Fidelity</th></tr></thead>
+            <tbody>
+              {% for row in data.quality_by_call_type %}
+              <tr>
+                <td>{{ row.display_name }}</td>
+                <td class="num">{{ row.clip_count }}</td>
+                <td class="num">{{ row.retention }}%</td>
+                <td class="num">{{ row.suppression }}%</td>
+                <td class="num">+{{ row.gain_db }} dB</td>
+                <td class="num">{{ row.fidelity }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" class="text-muted">Run <code>cleartusk benchmark</code> to populate this table.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+
+    <div class="card chart-card">
+      <div class="card-head">
+        <div>
+          <h3>Preset selection</h3>
+          <p class="text-muted">Which preset won the candidate search, per clip.</p>
+        </div>
+      </div>
+      <div class="chart-frame"><canvas id="chart-presets"></canvas></div>
+      <details class="data-table">
+        <summary>Show data table</summary>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Preset</th><th class="num">Clips</th></tr></thead>
+            <tbody>
+              {% for preset, count in data.preset_distribution.items() %}
+              <tr><td class="mono">{{ preset }}</td><td class="num">{{ count }}</td></tr>
+              {% else %}
+              <tr><td colspan="2" class="text-muted">No runs recorded yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="shell section-tight">
+  <div class="grid grid-2">
+    <div class="card chart-card">
+      <div class="card-head">
+        <div>
+          <h3>Retention spread</h3>
+          <p class="text-muted">Clips per retention band — the tail matters more than the mean.</p>
+        </div>
+      </div>
+      <div class="chart-frame"><canvas id="chart-retention"></canvas></div>
+    </div>
+    <div class="card chart-card">
+      <div class="card-head">
+        <div>
+          <h3>Call-to-noise gain spread</h3>
+          <p class="text-muted">Clips per decibel band of improvement.</p>
+        </div>
+      </div>
+      <div class="chart-frame"><canvas id="chart-gain"></canvas></div>
+    </div>
+  </div>
+</section>
+
+{% if data.detector %}
+<section class="shell section-tight">
+  <div class="card card-lg">
+    <div class="card-head">
+      <div>
+        <p class="eyebrow">Call detector</p>
+        <h2 style="margin: 0;">{{ data.detector.algorithm }}</h2>
+        <p class="text-secondary" style="max-width: 70ch;">
+          {{ data.detector.sample_count }} windows · {{ data.detector.feature_count }} features ·
+          {{ data.detector.cv_strategy }}. Grouping folds by source recording stops the model from
+          scoring well on field sites it has already heard.
+        </p>
+      </div>
+      <span class="badge badge-accent">trained {{ data.detector.trained_at|timeago }}</span>
+    </div>
+
+    <div class="grid grid-4" style="margin-bottom: 1.5rem;">
+      <div class="stat"><div class="stat__label">ROC-AUC</div><div class="stat__value">{{ data.detector.roc_auc|round(3) }}</div></div>
+      <div class="stat"><div class="stat__label">Accuracy</div><div class="stat__value">{{ (data.detector.accuracy * 100)|round(1) }}<small>%</small></div></div>
+      <div class="stat"><div class="stat__label">Precision</div><div class="stat__value">{{ (data.detector.precision * 100)|round(1) }}<small>%</small></div></div>
+      <div class="stat"><div class="stat__label">Recall</div><div class="stat__value">{{ (data.detector.recall * 100)|round(1) }}<small>%</small></div></div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="chart-card">
+        <h3 style="font-size: 1rem;">Per-fold scores</h3>
+        <div class="chart-legend" id="legend-folds"></div>
+        <div class="chart-frame"><canvas id="chart-folds"></canvas></div>
+      </div>
+      <div>
+        <h3 style="font-size: 1rem;">Features carrying the signal</h3>
+        <p class="text-muted" style="font-size: 0.86rem;">Accuracy lost when the feature is shuffled.</p>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Feature</th><th class="num">Accuracy drop</th></tr></thead>
+            <tbody>
+              {% for feature in data.detector.top_features %}
+              <tr><td class="mono">{{ feature.feature }}</td><td class="num">{{ (feature.accuracy_drop * 100)|round(2) }} pp</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="shell section-tight">
+  <div class="grid grid-2">
+    <div class="card chart-card">
+      <div class="card-head">
+        <div>
+          <h3>Benchmark history</h3>
+          <p class="text-muted">Corpus-wide means for each recorded sweep.</p>
+        </div>
+      </div>
+      <div class="chart-legend" id="legend-history"></div>
+      <div class="chart-frame"><canvas id="chart-history"></canvas></div>
+      <details class="data-table">
+        <summary>Show data table</summary>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Sweep</th><th>When</th><th class="num">Clips</th><th class="num">Retention</th><th class="num">Suppression</th><th class="num">Gain</th><th class="num">Speed</th></tr></thead>
+            <tbody>
+              {% for row in data.benchmark_history|reverse %}
+              <tr>
+                <td>{{ row.label }}</td>
+                <td>{{ row.created_at|timeago }}</td>
+                <td class="num">{{ row.clip_count }}</td>
+                <td class="num">{{ row.retention }}%</td>
+                <td class="num">{{ row.suppression }}%</td>
+                <td class="num">+{{ row.gain_db }} dB</td>
+                <td class="num">{{ row.realtime_factor }}×</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7" class="text-muted">No benchmark sweeps recorded yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+
+    <div class="card chart-card">
+      <div class="card-head">
+        <div>
+          <h3>Corpus composition</h3>
+          <p class="text-muted">
+            {{ data.corpus.clips }} annotated calls · {{ data.corpus.noise_reference_pct }}% have a
+            local noise reference · {{ data.corpus.context_pct }}% have context audio.
+          </p>
+        </div>
+      </div>
+      <div class="chart-frame"><canvas id="chart-corpus"></canvas></div>
+      <details class="data-table">
+        <summary>Show data table</summary>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Interference</th><th class="num">Clips</th><th class="num">Minutes</th></tr></thead>
+            <tbody>
+              {% for row in data.corpus.by_noise_source %}
+              <tr><td>{{ row.noise_source|title }}</td><td class="num">{{ row.clips }}</td><td class="num">{{ row.minutes }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="shell section-tight">
+  <div class="card chart-card">
+    <div class="card-head">
+      <div>
+        <h3>Studio activity</h3>
+        <p class="text-muted">Recordings processed per day over the last two weeks.</p>
+      </div>
+      <span class="badge">{{ data.storage.recordings }} stored recordings · {{ data.storage.stored_megabytes }} MB</span>
+    </div>
+    <div class="chart-frame" style="height: 200px;"><canvas id="chart-activity"></canvas></div>
+  </div>
+</section>
+
+<section class="shell section" style="padding-top: 1rem;">
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <h3>Latest runs</h3>
+        <p class="text-muted">Live results from the studio, newest first.</p>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('site.runs') }}">All runs</a>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Recording</th><th>When</th><th>Profile</th><th class="num">Retention</th><th class="num">Suppression</th><th class="num">Gain</th><th class="num">Events</th><th></th></tr></thead>
+        <tbody>
+          {% for run in data.recent_runs %}
+          <tr>
+            <td>{{ run.filename }}</td>
+            <td>{{ run.created_at|timeago }}</td>
+            <td><span class="badge badge-accent">{{ run.call_type }}</span></td>
+            <td class="num">{{ run.retention if run.retention is not none else '—' }}%</td>
+            <td class="num">{{ run.suppression if run.suppression is not none else '—' }}%</td>
+            <td class="num">+{{ run.gain_db if run.gain_db is not none else '—' }} dB</td>
+            <td class="num">{{ run.events }}</td>
+            <td><a class="btn btn-ghost btn-sm" href="{{ url_for('site.run_detail', public_id=run.id) }}">Open</a></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-muted">No runs yet — process a recording in the studio.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script type="application/json" id="dashboard-data">{{ data|tojson }}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+{% endblock %}
